@@ -2,9 +2,9 @@
   'use strict';
 
   /* ---------- Supabase ---------- */
-  const WEB3FORMS_KEY = '228a64ba-5e2e-47b7-9b1d-b202c76b0d27';
   const SUPABASE_URL = 'https://nfzsgmuybsqupcnjntje.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5menNnbXV5YnNxdXBjbmpudGplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMTgwNzMsImV4cCI6MjEwNzg5NDA3M30.HLWJ0ryJyujncHN2AljfXyO14TkXCF8z9DCV_ywadu8';
+  const WEB3FORMS_KEY = '228a64ba-5e2e-47b7-9b1d-b202c76b0d27'; // sends contact messages to your Gmail
   const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
   async function loadMentors() {
@@ -38,7 +38,7 @@
   const state = {
     added: load(KEYS.added, []), saved: load(KEYS.saved, []), sessions: load(KEYS.sessions, []),
     msgs: load(KEYS.msgs, []), me: load(KEYS.me, {name:'', email:''}),
-    q:'', skill:'All', sort:'featured', savedOnly:false
+    admin:false, q:'', skill:'All', sort:'featured', savedOnly:false
   };
   const persist = () => { save(KEYS.added,state.added); save(KEYS.saved,state.saved); save(KEYS.sessions,state.sessions); save(KEYS.msgs,state.msgs); save(KEYS.me,state.me); };
 
@@ -214,7 +214,7 @@
 
   /* One call refreshes every view so changes show up everywhere */
   function renderAll(animate = false) {
-    renderHome(); renderExplore(); renderSessions(); renderBadge(); renderStats(animate);
+    renderHome(); renderExplore(); renderSessions(); renderBadge(); renderStats(animate); renderAdmin();
     const r = route(); if (r.page === 'profile') renderProfile(r.id);
   }
 
@@ -222,7 +222,7 @@
   function route() {
     const h = location.hash.replace(/^#/, '') || 'home';
     const [page, id] = h.split('/');
-    const valid = ['home','explore','profile','sessions','register','about','contact'];
+    const valid = ['home','explore','profile','sessions','admin','about','contact'];
     return {page: valid.includes(page) ? page : 'home', id};
   }
   function show() {
@@ -231,6 +231,7 @@
     $$('.nav-link').forEach(a => { const on = a.dataset.route === page || (page === 'profile' && a.dataset.route === 'explore'); a.classList.toggle('active', on); on ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'); });
     if (page === 'profile') renderProfile(id);
     if (page === 'sessions') renderSessions();
+    if (page === 'admin') renderAdmin();
     if (page === 'explore') renderExplore();
     if (page === 'home' || page === 'about') renderStats(true);
     closeNav();
@@ -318,50 +319,118 @@
   }
 
   /* ---------- Forms ---------- */
-  async function submitRegister(e) {
+  /* ---------- Admin (only you can add or delete) ---------- */
+  function renderAdmin() {
+    const login = $('#admin-login-view'), panel = $('#admin-panel-view');
+    if (!login || !panel) return;
+    login.hidden = state.admin; panel.hidden = !state.admin;
+    $('#admin-sub').textContent = state.admin
+      ? 'Add new mentors and remove existing ones. Only a signed-in admin can do this.'
+      : 'Sign in to add or remove mentors.';
+    if (!state.admin) return;
+    const list = state.added;
+    $('#admin-mentor-list').innerHTML = list.length
+      ? list.map(m => `<div class="session-card">
+          <div class="avatar" style="background:${color(m.id)}" aria-hidden="true">${esc(initials(m.name))}</div>
+          <div class="session-info"><h3>${esc(m.name)} · ${esc(m.skill)}</h3><p>${esc(m.city)} · ${esc(m.home)}</p></div>
+          <div class="session-actions"><button type="button" class="btn btn-ghost btn-sm btn-danger" data-delete="${m.id}">Delete</button></div>
+        </div>`).join('')
+      : '<div class="empty-state"><p>No mentors added yet. Use the form above.</p></div>';
+  }
+  function setAdmin(session) {
+    state.admin = !!session;
+    const u = $('#admin-user'); if (u) u.textContent = session ? 'Signed in as ' + session.user.email : '';
+    renderAll();
+  }
+  async function initAdmin() {
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    setAdmin(data && data.session);
+    sb.auth.onAuthStateChange((_event, session) => setAdmin(session));
+  }
+  async function submitAdmin(e) {
+    e.preventDefault();
+    if (!sb) return;
+    const { error } = await sb.auth.signInWithPassword({ email: $('#adminEmail').value.trim(), password: $('#adminPassword').value });
+    if (error) { toast('Sign in failed: ' + error.message); return; }
+    $('#admin-form').reset(); toast('Signed in');
+  }
+  const notAllowed = err => /row-level security|permission|42501/i.test((err.message || '') + (err.code || ''));
+  async function submitAdminAdd(e) {
     e.preventDefault();
     const form = e.target;
     const ok = validate(form, {
-      homeName: req('the home name'), contactPerson: req('a contact person'),
-      contactPhone: v => !v ? 'Enter a contact phone.' : v.replace(/\D/g,'').length < 10 ? 'Enter a phone number with at least 10 digits.' : '',
-      homeCity: req('the city'), residentName: req('the resident\'s name'), residentAge: num('the resident\'s age', 50, 110),
-      residentSkill: v => v ? '' : 'Select a skill.', residentYears: num('years of experience', 1, 80),
-      residentBio: v => v.length < 20 ? 'Write at least 20 characters about them.' : ''
+      amHome: req('the home name'), amCity: req('the city'), amName: req('the resident\'s name'),
+      amAge: num('the resident\'s age', 50, 110), amSkill: v => v ? '' : 'Select a skill.',
+      amYears: num('years of experience', 1, 80), amBio: v => v.length < 20 ? 'Write at least 20 characters about them.' : ''
     });
     if (!ok) return;
-    if (!sb) { toast('Cannot reach the database right now. Please try again later.'); return; }
+    if (!sb) { toast('Cannot reach the database right now.'); return; }
     const g = id => $('#' + id).value.trim();
-    const contact = g('contactPerson'), phone = g('contactPhone');
     const btn = $('button[type="submit"]', form); btn.disabled = true;
-
     const { data: m, error } = await sb.from('mentors').insert({
-      name: g('residentName'), age: +g('residentAge'), skill: g('residentSkill'),
-      years: +g('residentYears'), city: g('homeCity'), home: g('homeName'), bio: g('residentBio')
+      name: g('amName'), age: +g('amAge'), skill: g('amSkill'), years: +g('amYears'),
+      city: g('amCity'), home: g('amHome'), bio: g('amBio')
     }).select().single();
     btn.disabled = false;
-    if (error) { console.error(error); toast('Something went wrong. Please try again.'); return; }
-
-    const { error: cErr } = await sb.from('home_contacts').insert({ mentor_id: m.id, contact, phone });
-    if (cErr) console.error(cErr);
-
+    if (error) { console.error(error); toast(notAllowed(error) ? 'Not allowed. Sign in with the admin account.' : 'Something went wrong. Please try again.'); return; }
+    if (g('amContact') || g('amPhone')) {
+      const { error: cErr } = await sb.from('home_contacts').insert({ mentor_id: m.id, contact: g('amContact'), phone: g('amPhone') });
+      if (cErr) console.error(cErr);
+    }
     state.added.push({ ...m, custom: true }); persist();
-    form.reset(); $('#bio-count').textContent = '0';
-    $('#register-success-text').textContent = `${m.name} is now on the squad as a ${m.skill.toLowerCase()} mentor. We'll call ${contact} to finish their profile.`;
-    $('#register-success').hidden = false; $('#register-success').scrollIntoView({block:'nearest'});
-    renderAll(true); toast(`${m.name} added to the team sheet`);
+    form.reset(); renderAll(true); toast(`${m.name} added to the team sheet`);
   }
-  function submitContact(e) {
+  async function deleteMentor(id) {
+    const m = mentorById(id);
+    if (!m || !sb) return;
+    if (!confirm(`Delete ${m.name} from the squad? This removes them for everyone and cannot be undone.`)) return;
+    const { data, error } = await sb.from('mentors').delete().eq('id', id).select();
+    if (error) { console.error(error); toast('Could not delete. Please try again.'); return; }
+    if (!data || !data.length) { toast('Not allowed. Sign in with the admin account.'); return; }
+    state.added = state.added.filter(x => x.id !== id);
+    state.saved = state.saved.filter(x => x !== id);
+    persist(); renderAll(); toast(`${m.name} deleted`);
+  }
+
+  /* ---------- Contact: saved to Supabase + emailed to you ---------- */
+  async function saveMessage(f) {
+    if (!sb) return false;
+    const { error } = await sb.from('messages').insert(f);
+    if (error) console.error(error);
+    return !error;
+  }
+  async function emailMessage(f) {
+    if (!WEB3FORMS_KEY || WEB3FORMS_KEY.startsWith('PASTE')) return false;
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ access_key: WEB3FORMS_KEY, subject: `Second Innings: ${f.topic} (from ${f.name})`, from_name: 'Second Innings website',
+          name: f.name, email: f.email, topic: f.topic, message: f.message })
+      });
+      const out = await res.json();
+      return !!out.success;
+    } catch (err) { console.error(err); return false; }
+  }
+  async function submitContact(e) {
     e.preventDefault();
-    if (!validate(e.target, {contactName: req('your name'), contactEmail: email, contactMessage: v => v.length < 10 ? 'Write a message of at least 10 characters.' : ''})) return;
-    state.msgs.push({id: uid('c'), name: $('#contactName').value.trim(), email: $('#contactEmail').value.trim(), message: $('#contactMessage').value.trim(), at: new Date().toISOString()});
-    if (sb) sb.from('messages').insert({ name: $('#contactName').value.trim(), email: $('#contactEmail').value.trim(), message: $('#contactMessage').value.trim() }).then(({ error }) => error && console.error(error));
-    persist(); e.target.reset(); $('#contact-success').hidden = false; toast('Message sent');
+    const form = e.target;
+    if (!validate(form, {contactName: req('your name'), contactEmail: email, contactMessage: v => v.length < 10 ? 'Write a message of at least 10 characters.' : ''})) return;
+    const f = { name: $('#contactName').value.trim(), email: $('#contactEmail').value.trim(), topic: $('#contactTopic').value, message: $('#contactMessage').value.trim() };
+    const btn = $('button[type="submit"]', form); btn.disabled = true;
+    const [saved, emailed] = await Promise.all([saveMessage(f), emailMessage(f)]);
+    btn.disabled = false;
+    if (!saved && !emailed) { toast('Could not send your message. Please try again.'); return; }
+    state.msgs.push({ id: uid('c'), ...f, at: new Date().toISOString() });
+    persist(); form.reset(); $('#contact-success').hidden = false; toast('Message sent');
   }
 
   /* ---------- Events ---------- */
   document.addEventListener('click', e => {
     const t = e.target.closest('button, a'); if (!t) return;
     if (t.dataset.book) return openBooking(t.dataset.book);
+    if (t.dataset.delete) return deleteMentor(t.dataset.delete);
+    if (t.id === 'admin-signout') { sb.auth.signOut(); toast('Signed out'); return; }
     if (t.dataset.save) {
       const id = t.dataset.save, i = state.saved.indexOf(id), m = mentorById(id);
       i < 0 ? state.saved.push(id) : state.saved.splice(i, 1);
@@ -379,7 +448,7 @@
     if (t.id === 'booking-done-btn') { lastFocus = null; return closeBooking(); }
     if (t.id === 'clear-filters') { Object.assign(state, {q:'', skill:'All', savedOnly:false, sort:'featured'}); $('#mentor-search').value = ''; $('#saved-only').checked = false; $('#mentor-sort').value = 'featured'; return renderExplore(); }
     if (t.id === 'reset-demo') {
-      if (confirm('Reset demo data? This clears added mentors, saved mentors, bookings and messages on this device.')) { Object.values(KEYS).forEach(k => localStorage.removeItem(k)); Object.assign(state, {added:[], saved:[], sessions:[], msgs:[], me:{name:'',email:''}}); renderAll(true); toast('Demo data reset'); }
+      if (confirm('Reset demo data? This clears saved mentors, bookings and messages on this device.')) { Object.values(KEYS).forEach(k => localStorage.removeItem(k)); Object.assign(state, {added:[], saved:[], sessions:[], msgs:[], me:{name:'',email:''}}); renderAll(true); loadMentors(); toast('Demo data reset'); }
     }
   });
   $('#modal-close').addEventListener('click', closeBooking);
@@ -398,11 +467,10 @@
   $('#saved-only').addEventListener('change', e => { state.savedOnly = e.target.checked; renderExplore(); });
   $('#nav-toggle').addEventListener('click', () => { const o = $('#main-nav').classList.toggle('open'); $('#nav-toggle').setAttribute('aria-expanded', o); });
   $('#booking-form').addEventListener('submit', submitBooking);
-  $('#register-form').addEventListener('submit', submitRegister);
+  $('#admin-form').addEventListener('submit', submitAdmin);
+  $('#admin-add-form').addEventListener('submit', submitAdminAdd);
   $('#contact-form').addEventListener('submit', submitContact);
-  $('#residentBio').addEventListener('input', e => { $('#bio-count').textContent = e.target.value.length; });
   $$('form').forEach(f => f.addEventListener('input', e => { if (e.target.closest('.has-error')) setErr(e.target, ''); }));
-  $('#register-form').addEventListener('input', () => { $('#register-success').hidden = true; });
   $('#contact-form').addEventListener('input', () => { $('#contact-success').hidden = true; });
   window.addEventListener('hashchange', show);
 
@@ -416,6 +484,7 @@
   /* ---------- Init ---------- */
   renderAll(false);
   loadMentors();
+  initAdmin();
   $$('[data-stat]').forEach(el => shown.delete(el)); // so the scoreboard counts up on first view
   show();
 })();
