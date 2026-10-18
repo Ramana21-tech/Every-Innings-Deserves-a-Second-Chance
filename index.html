@@ -23,9 +23,9 @@
       <a href="#home" class="nav-link" data-nav data-route="home">Home</a>
       <a href="#explore" class="nav-link" data-nav data-route="explore">The Squad</a>
       <a href="#sessions" class="nav-link" data-nav data-route="sessions">My Sessions <span class="nav-badge" id="nav-badge" hidden>0</span></a>
-      <a href="#register" class="nav-link" data-nav data-route="register">Register a Home</a>
       <a href="#about" class="nav-link" data-nav data-route="about">About</a>
       <a href="#contact" class="nav-link" data-nav data-route="contact">Contact</a>
+      <a href="#admin" class="nav-link" data-nav data-route="admin">Admin</a>
     </nav>
     <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="main-nav">
       <span></span><span></span><span></span>
@@ -45,7 +45,7 @@
         <p class="hero-sub">Second Innings connects elders from old age homes across Tamil Nadu with people ready to learn what they know — cooking, tailoring, music, tuition, storytelling, language, gardening, crafts. Decades of skill, still in play.</p>
         <div class="hero-ctas">
           <a href="#explore" class="btn btn-primary" data-nav>Meet the Squad</a>
-          <a href="#register" class="btn btn-ghost" data-nav>Register a Home</a>
+          <a href="#contact" class="btn btn-ghost" data-nav>Request to Join</a>
         </div>
       </div>
       <div class="scoreboard" aria-label="Second Innings scoreboard">
@@ -130,58 +130,59 @@
     <div class="sessions-shell" id="sessions-list"></div>
   </section>
 
-  <!-- REGISTER -->
-  <section class="page" id="page-register" data-page="register">
+  <!-- ADMIN -->
+  <section class="page" id="page-admin" data-page="admin">
     <div class="page-header">
-      <p class="section-eyebrow">Join the league</p>
-      <h1 class="section-title" tabindex="-1">Register an old age home.</h1>
-      <p class="page-sub">Tell us about your home and the residents who'd like a place on the team sheet. They appear on the squad straight away.</p>
+      <p class="section-eyebrow">Admin</p>
+      <h1 class="section-title" tabindex="-1">Manage the squad.</h1>
+      <p class="page-sub" id="admin-sub">Sign in to add or remove mentors.</p>
     </div>
-    <div class="form-shell">
-      <div class="success-banner" id="register-success" role="status" hidden>
-        <strong>Added to the team sheet!</strong> <span id="register-success-text">We'll be in touch shortly to set up the resident's profile.</span>
-        <a href="#explore" class="text-link" data-nav>See the squad &rarr;</a>
-      </div>
-      <form id="register-form" novalidate>
-        <fieldset>
-          <legend>About the home</legend>
-          <div class="form-row"><label for="homeName">Home name</label><input type="text" id="homeName" name="homeName" autocomplete="organization"></div>
-          <div class="form-row form-row-split">
-            <div><label for="contactPerson">Contact person</label><input type="text" id="contactPerson" name="contactPerson" autocomplete="name"></div>
-            <div><label for="contactPhone">Contact phone</label><input type="tel" id="contactPhone" name="contactPhone" autocomplete="tel" placeholder="+91 98765 43210"></div>
-          </div>
-          <div class="form-row"><label for="homeCity">City</label><input type="text" id="homeCity" name="homeCity" autocomplete="address-level2"></div>
-        </fieldset>
-        <fieldset>
-          <legend>About the resident</legend>
-          <div class="form-row form-row-split">
-            <div><label for="residentName">Resident name</label><input type="text" id="residentName" name="residentName"></div>
-            <div><label for="residentAge">Resident age</label><input type="number" id="residentAge" name="residentAge" min="50" max="110"></div>
-          </div>
-          <div class="form-row form-row-split">
-            <div>
-              <label for="residentSkill">Skill category</label>
-              <select id="residentSkill" name="residentSkill">
-                <option value="" disabled selected>Select a skill</option>
-                <option>Cooking</option><option>Tailoring</option><option>Music</option><option>Tuition</option>
-                <option>Storytelling</option><option>Language</option><option>Gardening</option><option>Crafts</option>
-              </select>
-            </div>
-            <div><label for="residentYears">Years of experience</label><input type="number" id="residentYears" name="residentYears" min="1" max="80"></div>
-          </div>
-          <div class="form-row">
-            <label for="residentBio">A little about them</label>
-            <textarea id="residentBio" name="residentBio" rows="4" maxlength="500" placeholder="What do they love teaching? How long have they practiced this skill?"></textarea>
-            <p class="field-hint"><span id="bio-count">0</span>/500 characters</p>
-          </div>
-          <div class="form-row">
-            <label for="residentPhoto">Resident photo (optional)</label>
-            <input type="file" id="residentPhoto" name="residentPhoto" accept="image/*">
-            <p class="field-hint">Photo upload is illustrative in this demo — nothing is stored or sent yet.</p>
-          </div>
-        </fieldset>
-        <button type="submit" class="btn btn-primary">Add to the team sheet</button>
+
+    <div class="form-shell" id="admin-login-view">
+      <form id="admin-form" novalidate>
+        <div class="form-row"><label for="adminEmail">Email</label><input type="email" id="adminEmail" autocomplete="username"></div>
+        <div class="form-row"><label for="adminPassword">Password</label><input type="password" id="adminPassword" autocomplete="current-password"></div>
+        <button type="submit" class="btn btn-primary">Sign in</button>
       </form>
+    </div>
+
+    <div id="admin-panel-view" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem">
+        <strong id="admin-user"></strong>
+        <button type="button" class="btn btn-ghost btn-sm" id="admin-signout">Sign out</button>
+      </div>
+      <div class="form-shell">
+        <form id="admin-add-form" novalidate>
+          <fieldset>
+            <legend>Add a home and resident</legend>
+            <div class="form-row"><label for="amHome">Home name</label><input type="text" id="amHome"></div>
+            <div class="form-row form-row-split">
+              <div><label for="amContact">Contact person (private, optional)</label><input type="text" id="amContact"></div>
+              <div><label for="amPhone">Contact phone (private, optional)</label><input type="tel" id="amPhone"></div>
+            </div>
+            <div class="form-row"><label for="amCity">City</label><input type="text" id="amCity"></div>
+            <div class="form-row form-row-split">
+              <div><label for="amName">Resident name</label><input type="text" id="amName"></div>
+              <div><label for="amAge">Resident age</label><input type="number" id="amAge" min="50" max="110"></div>
+            </div>
+            <div class="form-row form-row-split">
+              <div>
+                <label for="amSkill">Skill category</label>
+                <select id="amSkill">
+                  <option value="" disabled selected>Select a skill</option>
+                  <option>Cooking</option><option>Tailoring</option><option>Music</option><option>Tuition</option>
+                  <option>Storytelling</option><option>Language</option><option>Gardening</option><option>Crafts</option>
+                </select>
+              </div>
+              <div><label for="amYears">Years of experience</label><input type="number" id="amYears" min="1" max="80"></div>
+            </div>
+            <div class="form-row"><label for="amBio">A little about them</label><textarea id="amBio" rows="4" maxlength="500"></textarea></div>
+          </fieldset>
+          <button type="submit" class="btn btn-primary">Add to the team sheet</button>
+        </form>
+      </div>
+      <h2 class="session-group-title">Mentors you can remove</h2>
+      <div class="sessions-shell" id="admin-mentor-list"></div>
     </div>
   </section>
 
@@ -209,7 +210,7 @@
     <div class="page-header">
       <p class="section-eyebrow">Contact</p>
       <h1 class="section-title" tabindex="-1">Get in touch with the pavilion.</h1>
-      <p class="page-sub">Questions, partnership ideas, or press enquiries — we read everything that comes in.</p>
+      <p class="page-sub">Questions, partnership ideas, press enquiries — or a request to add your home or a resident to the squad. We read everything that comes in.</p>
     </div>
     <div class="contact-shell">
       <div class="form-shell">
@@ -217,7 +218,15 @@
         <form id="contact-form" novalidate>
           <div class="form-row"><label for="contactName">Name</label><input type="text" id="contactName" name="name" autocomplete="name"></div>
           <div class="form-row"><label for="contactEmail">Email</label><input type="email" id="contactEmail" name="email" autocomplete="email"></div>
-          <div class="form-row"><label for="contactMessage">Message</label><textarea id="contactMessage" name="message" rows="5"></textarea></div>
+          <div class="form-row">
+            <label for="contactTopic">What is this about?</label>
+            <select id="contactTopic" name="topic">
+              <option>General question</option>
+              <option>Add a home or resident to the squad</option>
+              <option>Partnership or press</option>
+            </select>
+          </div>
+          <div class="form-row"><label for="contactMessage">Message</label><textarea id="contactMessage" name="message" rows="5"></textarea><p class="field-hint">Asking to add a home or resident? Please include the home's name and city, the resident's name, age and skill, and a phone number we can call.</p></div>
           <button type="submit" class="btn btn-primary">Send message</button>
         </form>
       </div>
@@ -238,7 +247,7 @@
     <p>Every innings deserves a second chance.</p>
     <nav class="footer-nav" aria-label="Footer">
       <a href="#home" data-nav>Home</a><a href="#explore" data-nav>The Squad</a><a href="#sessions" data-nav>My Sessions</a>
-      <a href="#register" data-nav>Register a Home</a><a href="#about" data-nav>About</a><a href="#contact" data-nav>Contact</a>
+      <a href="#about" data-nav>About</a><a href="#contact" data-nav>Contact</a>
     </nav>
     <p class="footer-copy">&copy; 2026 Second Innings. A community project, not (yet) a company. · <button type="button" class="link-btn" id="reset-demo">Reset demo data</button></p>
   </div>
