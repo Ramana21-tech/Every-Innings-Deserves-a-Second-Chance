@@ -3,7 +3,7 @@
 
   /* ---------- Supabase ---------- */
   const SUPABASE_URL = 'https://nfzsgmuybsqupcnjntje.supabase.co';
-  const SUPABASE_KEY = 'PASTE_YOUR_ANON_KEY_HERE';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5menNnbXV5YnNxdXBjbmpudGplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMTgwNzMsImV4cCI6MjEwNzg5NDA3M30.HLWJ0ryJyujncHN2AljfXyO14TkXCF8z9DCV_ywadu8';
   const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
   async function loadMentors() {
