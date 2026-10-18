@@ -1,6 +1,18 @@
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 (() => {
   'use strict';
+
+  /* ---------- Supabase ---------- */
+  const SUPABASE_URL = 'https://nfzsgmuybsqupcnjntje.supabase.co';
+  const SUPABASE_KEY = 'PASTE_YOUR_ANON_KEY_HERE';
+  const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+  async function loadMentors() {
+    if (!sb) return;
+    const { data, error } = await sb.from('mentors').select('*').order('created_at');
+    if (error) { console.error(error); return; }
+    state.added = data.map(r => ({ ...r, custom: true }));
+    renderAll();
+  }
 
   /* ---------- Data ---------- */
   const SKILLS = ['Cooking','Tailoring','Music','Tuition','Storytelling','Language','Gardening','Crafts'];
@@ -285,6 +297,7 @@
     if (state.sessions.some(x => x.status !== 'cancelled' && x.date === s.date && x.slot === s.slot)) { setErr($('#bookingSlot'), 'You already have a session in that slot. Pick another.'); return; }
     state.me = {name: s.name, email: s.email};
     state.sessions.push(s); persist(); lastBooking = s;
+    if (sb) sb.from('bookings').insert({ mentor_id: s.mentorId, mentor_name: s.mentorName, name: s.name, email: s.email, date: s.date, slot: s.slot, mode: s.mode, note: s.note }).then(({ error }) => error && console.error(error));
     $('#booking-confirm-text').textContent = `${m.name} will see you on ${fmtDate(s.date)}, ${SLOTS[s.slot]} (${s.mode}). A confirmation has been sent to ${s.email}.`;
     $('#booking-form-view').hidden = true; $('#booking-confirm-view').hidden = false;
     renderAll(true);
@@ -304,9 +317,10 @@
   }
 
   /* ---------- Forms ---------- */
-  function submitRegister(e) {
+  async function submitRegister(e) {
     e.preventDefault();
-    const ok = validate(e.target, {
+    const form = e.target;
+    const ok = validate(form, {
       homeName: req('the home name'), contactPerson: req('a contact person'),
       contactPhone: v => !v ? 'Enter a contact phone.' : v.replace(/\D/g,'').length < 10 ? 'Enter a phone number with at least 10 digits.' : '',
       homeCity: req('the city'), residentName: req('the resident\'s name'), residentAge: num('the resident\'s age', 50, 110),
@@ -314,11 +328,24 @@
       residentBio: v => v.length < 20 ? 'Write at least 20 characters about them.' : ''
     });
     if (!ok) return;
+    if (!sb) { toast('Cannot reach the database right now. Please try again later.'); return; }
     const g = id => $('#' + id).value.trim();
-    const m = {id: uid('n'), custom: true, name: g('residentName'), age: +g('residentAge'), skill: g('residentSkill'), years: +g('residentYears'),
-      city: g('homeCity'), home: g('homeName'), rating: 5.0, sessions: 0, bio: g('residentBio'), contact: g('contactPerson'), phone: g('contactPhone')};
-    state.added.push(m); persist(); e.target.reset(); $('#bio-count').textContent = '0';
-    $('#register-success-text').textContent = `${m.name} is now on the squad as a ${m.skill.toLowerCase()} mentor. We'll call ${m.contact} to finish their profile.`;
+    const contact = g('contactPerson'), phone = g('contactPhone');
+    const btn = $('button[type="submit"]', form); btn.disabled = true;
+
+    const { data: m, error } = await sb.from('mentors').insert({
+      name: g('residentName'), age: +g('residentAge'), skill: g('residentSkill'),
+      years: +g('residentYears'), city: g('homeCity'), home: g('homeName'), bio: g('residentBio')
+    }).select().single();
+    btn.disabled = false;
+    if (error) { console.error(error); toast('Something went wrong. Please try again.'); return; }
+
+    const { error: cErr } = await sb.from('home_contacts').insert({ mentor_id: m.id, contact, phone });
+    if (cErr) console.error(cErr);
+
+    state.added.push({ ...m, custom: true }); persist();
+    form.reset(); $('#bio-count').textContent = '0';
+    $('#register-success-text').textContent = `${m.name} is now on the squad as a ${m.skill.toLowerCase()} mentor. We'll call ${contact} to finish their profile.`;
     $('#register-success').hidden = false; $('#register-success').scrollIntoView({block:'nearest'});
     renderAll(true); toast(`${m.name} added to the team sheet`);
   }
@@ -326,6 +353,7 @@
     e.preventDefault();
     if (!validate(e.target, {contactName: req('your name'), contactEmail: email, contactMessage: v => v.length < 10 ? 'Write a message of at least 10 characters.' : ''})) return;
     state.msgs.push({id: uid('c'), name: $('#contactName').value.trim(), email: $('#contactEmail').value.trim(), message: $('#contactMessage').value.trim(), at: new Date().toISOString()});
+    if (sb) sb.from('messages').insert({ name: $('#contactName').value.trim(), email: $('#contactEmail').value.trim(), message: $('#contactMessage').value.trim() }).then(({ error }) => error && console.error(error));
     persist(); e.target.reset(); $('#contact-success').hidden = false; toast('Message sent');
   }
 
@@ -386,6 +414,7 @@
 
   /* ---------- Init ---------- */
   renderAll(false);
+  loadMentors();
   $$('[data-stat]').forEach(el => shown.delete(el)); // so the scoreboard counts up on first view
   show();
 })();
